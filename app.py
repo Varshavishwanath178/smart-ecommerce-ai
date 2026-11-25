@@ -1035,125 +1035,412 @@ def get_review_classifier():
     return vectorizer, classifier
 
 
-def answer_question(question, lang_code):
-    query = question.casefold()
-    language_keywords = INTENT_KEYWORDS.get(lang_code, {})
-    local_keywords = LOCAL_INTENT_KEYWORDS.get(lang_code, {})
+CHATBOT_ANSWER_BANK = {
+    "services": {
+        "en": "We provide AI product recommendations, order tracking, fast India-wide delivery, 7-day returns, secure payments, warranty help, and fake-review checks.",
+        "kn": "AI ಉತ್ಪನ್ನ ಶಿಫಾರಸು, ಆರ್ಡರ್ ಟ್ರ್ಯಾಕಿಂಗ್, ಭಾರತದಾದ್ಯಂತ ವೇಗದ ಡೆಲಿವರಿ, 7 ದಿನಗಳ ರಿಟರ್ನ್, ಸುರಕ್ಷಿತ ಪಾವತಿ, ವಾರಂಟಿ ಸಹಾಯ ಮತ್ತು ನಕಲಿ ವಿಮರ್ಶೆ ಪರಿಶೀಲನೆ ಒದಗಿಸುತ್ತೇವೆ.",
+        "hi": "हम AI उत्पाद सुझाव, ऑर्डर ट्रैकिंग, पूरे भारत में तेज़ डिलीवरी, 7-दिन रिटर्न, सुरक्षित भुगतान, वारंटी सहायता और नकली समीक्षा जाँच देते हैं।",
+        "ta": "AI தயாரிப்பு பரிந்துரைகள், ஆர்டர் கண்காணிப்பு, இந்தியா முழுவதும் விரைவு விநியோகம், 7 நாள் திரும்பப்பெறுதல், பாதுகாப்பான கட்டணம், உத்தரவாத உதவி, போலி மதிப்புரை சரிபார்ப்பு வழங்குகிறோம்.",
+        "te": "AI ఉత్పత్తి సిఫార్సులు, ఆర్డర్ ట్రాకింగ్, భారత్ అంతటా వేగవంతమైన డెలివరీ, 7 రోజుల రిటర్న్, సురక్షిత చెల్లింపులు, వారంటీ సహాయం, నకిలీ సమీక్ష తనిఖీ అందిస్తాం.",
+    },
+    "delivery": {
+        "en": "We deliver across India, including Mysore, Bengaluru, and Karnataka. Delivery usually takes 2–4 days.",
+        "kn": "ಮೈಸೂರು, ಬೆಂಗಳೂರು ಮತ್ತು ಕರ್ನಾಟಕ ಸೇರಿದಂತೆ ಭಾರತದಾದ್ಯಂತ ಡೆಲಿವರಿ ಮಾಡುತ್ತೇವೆ. ಸಾಮಾನ್ಯವಾಗಿ 2–4 ದಿನಗಳಲ್ಲಿ ತಲುಪುತ್ತದೆ.",
+        "hi": "हम मैसूर, बेंगलुरु और कर्नाटक सहित पूरे भारत में डिलीवरी करते हैं। आमतौर पर 2–4 दिन लगते हैं।",
+        "ta": "மைசூர், பெங்களூரு, கர்நாடகா உட்பட இந்தியா முழுவதும் விநியோகம் செய்கிறோம். வழக்கமாக 2–4 நாட்களில் கிடைக்கும்.",
+        "te": "మైసూరు, బెంగళూరు, కర్ణాటకతో సహా భారత్ అంతటా డెలివరీ చేస్తాం. సాధారణంగా 2–4 రోజుల్లో చేరుతుంది.",
+    },
+    "shipping_fee": {
+        "en": "Shipping is free on orders above ₹499. Orders of ₹499 or less may have a delivery fee shown at checkout.",
+        "kn": "₹499 క್ಕಿಂತ ಹೆಚ್ಚಿನ ಆರ್ಡರ್‌ಗಳಿಗೆ ಡೆಲಿವರಿ ಉಚಿತ. ₹499 ಅಥವಾ ಕಡಿಮೆ ಆರ್ಡರ್‌ಗಳ ಶುಲ್ಕ ಚೆಕ್‌ಔಟ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+        "hi": "₹499 से अधिक के ऑर्डर पर डिलीवरी मुफ़्त है। ₹499 या उससे कम के ऑर्डर का शुल्क चेकआउट पर दिखेगा।",
+        "ta": "₹499-க்கு மேற்பட்ட ஆர்டர்களுக்கு விநியோகம் இலவசம். ₹499 அல்லது அதற்குக் குறைவான ஆர்டர்களுக்கான கட்டணம் செக் அவுட்டில் காட்டப்படும்.",
+        "te": "₹499 కంటే ఎక్కువ ఆర్డర్లకు డెలివరీ ఉచితం. ₹499 లేదా అంతకంటే తక్కువ ఆర్డర్లకు రుసుము చెక్అవుట్‌లో చూపబడుతుంది.",
+    },
+    "returns": {
+        "en": "Eligible products can be returned within 7 days of delivery, with no questions asked. Schedule a pickup from My Orders.",
+        "kn": "ಅರ್ಹ ಉತ್ಪನ್ನಗಳನ್ನು ಡೆಲಿವರಿ ಆದ 7 ದಿನಗಳೊಳಗೆ ಯಾವುದೇ ಪ್ರಶ್ನೆಯಿಲ್ಲದೆ ಹಿಂತಿರುಗಿಸಬಹುದು. My Orders ನಲ್ಲಿ ಪಿಕಪ್ ನಿಗದಿಪಡಿಸಿ.",
+        "hi": "पात्र उत्पाद डिलीवरी के 7 दिनों के भीतर बिना सवाल लौटाए जा सकते हैं। My Orders में पिकअप तय करें।",
+        "ta": "தகுதியுள்ள பொருட்களை விநியோகித்த 7 நாட்களுக்குள் கேள்வியின்றி திருப்பலாம். My Orders-இல் பிக்கப்பை திட்டமிடுங்கள்.",
+        "te": "అర్హమైన ఉత్పత్తులను డెలివరీ అయిన 7 రోజుల్లో ఎలాంటి ప్రశ్నలు లేకుండా తిరిగి ఇవ్వవచ్చు. My Ordersలో పికప్‌ను ఏర్పాటు చేయండి.",
+    },
+    "exchange": {
+        "en": "Eligible items can be exchanged within 7 days of delivery. Start an exchange request in My Orders.",
+        "kn": "ಅರ್ಹ ವಸ್ತುಗಳನ್ನು ಡೆಲಿವರಿ ಆದ 7 ದಿನಗಳಲ್ಲಿ ಬದಲಾಯಿಸಬಹುದು. My Orders ನಲ್ಲಿ ವಿನಿಮಯ ವಿನಂತಿ ಸಲ್ಲಿಸಿ.",
+        "hi": "पात्र वस्तुएँ डिलीवरी के 7 दिनों के भीतर बदली जा सकती हैं। My Orders में अनुरोध शुरू करें।",
+        "ta": "தகுதியுள்ள பொருட்களை விநியோகித்த 7 நாட்களுக்குள் மாற்றலாம். My Orders-இல் கோரிக்கையைத் தொடங்குங்கள்.",
+        "te": "అర్హమైన వస్తువులను డెలివరీ అయిన 7 రోజుల్లో మార్చుకోవచ్చు. My Ordersలో అభ్యర్థన ప్రారంభించండి.",
+    },
+    "refund": {
+        "en": "After a returned item is picked up and checked, the refund is issued to the original payment method within 3–5 business days.",
+        "kn": "ವಸ್ತುವನ್ನು ಪಿಕಪ್ ಮಾಡಿ ಪರಿಶೀಲಿಸಿದ ನಂತರ, ರಿಫಂಡ್ ಮೂಲ ಪಾವತಿ ವಿಧಾನಕ್ಕೆ 3–5 ಕೆಲಸದ ದಿನಗಳಲ್ಲಿ ಜಮೆಯಾಗುತ್ತದೆ.",
+        "hi": "वापसी की वस्तु पिकअप और जाँच के बाद रिफंड मूल भुगतान माध्यम में 3–5 कार्यदिवस में जमा होता है।",
+        "ta": "திருப்பிய பொருள் பிக்கப் செய்து சரிபார்த்த பின், அசல் கட்டண முறைக்கு 3–5 வேலை நாட்களில் பணம் திரும்பும்.",
+        "te": "రిటర్న్ వస్తువును పికప్ చేసి తనిఖీ చేసిన తర్వాత, అసలు చెల్లింపు పద్ధతికి 3–5 పని దినాల్లో రీఫండ్ జమ అవుతుంది.",
+    },
+    "payments": {
+        "en": "We accept UPI, Google Pay (GPay), PhonePe, Paytm, credit/debit cards, net banking, and Cash on Delivery where available.",
+        "kn": "UPI, Google Pay (GPay), PhonePe, Paytm, ಕ್ರೆಡಿಟ್/ಡೆಬಿಟ್ ಕಾರ್ಡ್, ನೆಟ್ ಬ್ಯಾಂಕಿಂಗ್ ಮತ್ತು ಲಭ್ಯವಿದ್ದಲ್ಲಿ Cash on Delivery ಸ್ವೀಕರಿಸುತ್ತೇವೆ.",
+        "hi": "हम UPI, Google Pay (GPay), PhonePe, Paytm, क्रेडिट/डेबिट कार्ड, नेट बैंकिंग और उपलब्धता के अनुसार Cash on Delivery स्वीकार करते हैं।",
+        "ta": "UPI, Google Pay (GPay), PhonePe, Paytm, கிரெடிட்/டெபிட் கார்டு, நெட் பேங்கிங் மற்றும் கிடைக்கும் இடங்களில் Cash on Delivery ஏற்கிறோம்.",
+        "te": "UPI, Google Pay (GPay), PhonePe, Paytm, క్రెడిట్/డెబిట్ కార్డులు, నెట్ బ్యాంకింగ్, అందుబాటులో ఉన్న చోట Cash on Delivery అంగీకరిస్తాం.",
+    },
+    "tracking": {
+        "en": "Sign in, open My Orders, and enter or select your Order ID to view its latest status and tracking link.",
+        "kn": "ಸೈನ್ ಇನ್ ಮಾಡಿ, My Orders ತೆರೆಯಿರಿ ಮತ್ತು Order ID ಆಯ್ಕೆ ಮಾಡಿ; ಇತ್ತೀಚಿನ ಸ್ಥಿತಿ ಹಾಗೂ ಟ್ರ್ಯಾಕಿಂಗ್ ಲಿಂಕ್ ಕಾಣುತ್ತದೆ.",
+        "hi": "साइन इन करें, My Orders खोलें और Order ID चुनें। वहाँ नवीनतम स्थिति और ट्रैकिंग लिंक दिखेगा।",
+        "ta": "உள்நுழைந்து My Orders திறந்து Order ID-ஐத் தேர்ந்தெடுக்கவும். சமீபத்திய நிலையும் கண்காணிப்பு இணைப்பும் அங்கே இருக்கும்.",
+        "te": "సైన్ ఇన్ చేసి My Orders తెరిచి Order IDని ఎంచుకోండి. తాజా స్థితి, ట్రాకింగ్ లింక్ అక్కడ కనిపిస్తాయి.",
+    },
+    "cancel": {
+        "en": "You can cancel an order free of charge any time before it is dispatched. Open My Orders and select Cancel.",
+        "kn": "ಆರ್ಡರ್ ರವಾನೆಯಾಗುವ ಮೊದಲು ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ಉಚಿತವಾಗಿ ರದ್ದುಮಾಡಬಹುದು. My Orders ತೆರೆಯಿರಿ ಮತ್ತು Cancel ಆಯ್ಕೆಮಾಡಿ.",
+        "hi": "ऑर्डर भेजे जाने से पहले कभी भी मुफ़्त रद्द कर सकते हैं। My Orders खोलकर Cancel चुनें।",
+        "ta": "ஆர்டர் அனுப்பப்படுவதற்கு முன் எப்போது வேண்டுமானாலும் இலவசமாக ரத்து செய்யலாம். My Orders-இல் Cancel தேர்ந்தெடுக்கவும்.",
+        "te": "ఆర్డర్ పంపే ముందు ఎప్పుడైనా ఉచితంగా రద్దు చేయవచ్చు. My Orders తెరిచి Cancel ఎంచుకోండి.",
+    },
+    "offers": {
+        "en": "Use WELCOME10 for 10% off your first order. Seasonal deals are available across categories; check Offers for current terms.",
+        "kn": "ಮೊದಲ ಆರ್ಡರ್‌ಗೆ 10% ರಿಯಾಯಿತಿಗಾಗಿ WELCOME10 ಬಳಸಿ. ವಿಭಾಗಗಳಾದ್ಯಂತ ಋತುಮಾನದ ಆಫರ್‌ಗಳಿವೆ; ನಿಯಮಗಳಿಗೆ Offers ನೋಡಿ.",
+        "hi": "पहले ऑर्डर पर 10% छूट के लिए WELCOME10 इस्तेमाल करें। सभी श्रेणियों में मौसमी ऑफ़र हैं; शर्तों के लिए Offers देखें।",
+        "ta": "முதல் ஆர்டருக்கு 10% தள்ளுபடி பெற WELCOME10 பயன்படுத்துங்கள். பருவகால சலுகைகளுக்கு Offers பகுதியைப் பார்க்கவும்.",
+        "te": "మొదటి ఆర్డర్‌పై 10% తగ్గింపుకు WELCOME10 ఉపయోగించండి. అన్ని విభాగాల్లో సీజనల్ ఆఫర్లు ఉన్నాయి; నిబంధనలకు Offers చూడండి.",
+    },
+    "catalog": {
+        "en": "The catalog has 20 products across Electronics, Fashion & Apparel, Home & Kitchen, Beauty & Personal Care, Sports & Fitness, and Books.",
+        "kn": "ಕ್ಯಾಟಲಾಗ್‌ನಲ್ಲಿ Electronics, Fashion & Apparel, Home & Kitchen, Beauty & Personal Care, Sports & Fitness ಮತ್ತು Books ವಿಭಾಗಗಳ 20 ಉತ್ಪನ್ನಗಳಿವೆ.",
+        "hi": "कैटलॉग में Electronics, Fashion & Apparel, Home & Kitchen, Beauty & Personal Care, Sports & Fitness और Books के 20 उत्पाद हैं।",
+        "ta": "Electronics, Fashion & Apparel, Home & Kitchen, Beauty & Personal Care, Sports & Fitness, Books ஆகிய பிரிவுகளில் 20 பொருட்கள் உள்ளன.",
+        "te": "కేటలాగ్‌లో Electronics, Fashion & Apparel, Home & Kitchen, Beauty & Personal Care, Sports & Fitness, Books విభాగాల్లో 20 ఉత్పత్తులు ఉన్నాయి.",
+    },
+    "starting_price": {
+        "en": "Catalog prices start at ₹499. The lowest-priced item is The Quiet Horizon; name a product for its exact price.",
+        "kn": "ಕ್ಯಾಟಲಾಗ್ ಬೆಲೆಗಳು ₹499 ರಿಂದ ಪ್ರಾರಂಭವಾಗುತ್ತವೆ. ಕಡಿಮೆ ಬೆಲೆಯ ಉತ್ಪನ್ನ The Quiet Horizon; ನಿಖರ ಬೆಲೆಗೆ ಉತ್ಪನ್ನದ ಹೆಸರನ್ನು ತಿಳಿಸಿ.",
+        "hi": "कैटलॉग की कीमतें ₹499 से शुरू होती हैं। सबसे कम कीमत वाला उत्पाद The Quiet Horizon है; सटीक कीमत के लिए उत्पाद का नाम बताइए।",
+        "ta": "பட்டியல் விலைகள் ₹499 முதல் தொடங்குகின்றன. குறைந்த விலை The Quiet Horizon; துல்லியமான விலைக்கு பொருளின் பெயரைக் கூறுங்கள்.",
+        "te": "కేటలాగ్ ధరలు ₹499 నుంచి ప్రారంభమవుతాయి. అతి తక్కువ ధర ఉత్పత్తి The Quiet Horizon; ఖచ్చితమైన ధరకు ఉత్పత్తి పేరు చెప్పండి.",
+    },
+    "recommendations": {
+        "en": "Choose a product in the Product Recommender tab to see three similar items ranked by description similarity.",
+        "kn": "Product Recommender ಟ್ಯಾಬ್‌ನಲ್ಲಿ ಉತ್ಪನ್ನ ಆಯ್ಕೆಮಾಡಿ; ವಿವರಣೆಯ ಹೋಲಿಕೆಯ ಆಧಾರದ ಮೇಲೆ ಮೂರು ಉತ್ಪನ್ನಗಳನ್ನು ನೋಡಬಹುದು.",
+        "hi": "Product Recommender टैब में उत्पाद चुनें। विवरण की समानता के आधार पर तीन मिलते-जुलते उत्पाद दिखेंगे।",
+        "ta": "Product Recommender தாவலில் ஒரு பொருளைத் தேர்ந்தெடுக்கவும். விளக்க ஒற்றுமைப்படி மூன்று பொருட்கள் காட்டப்படும்.",
+        "te": "Product Recommender ట్యాబ్‌లో ఉత్పత్తిని ఎంచుకోండి. వివరణ సారూప్యత ఆధారంగా మూడు ఉత్పత్తులు చూపబడతాయి.",
+    },
+    "bestsellers": {
+        "en": "Popular picks include the Nova X Pro Smartphone, FlexRun Running Shoes, GlowPure Vitamin C Face Serum, BrewMate French Press, PowerFlex Yoga Mat, and The Quiet Horizon.",
+        "kn": "ಜನಪ್ರಿಯ ಆಯ್ಕೆಗಳು Nova X Pro Smartphone, FlexRun Running Shoes, GlowPure Vitamin C Face Serum, BrewMate French Press, PowerFlex Yoga Mat ಮತ್ತು The Quiet Horizon.",
+        "hi": "लोकप्रिय विकल्पों में Nova X Pro Smartphone, FlexRun Running Shoes, GlowPure Vitamin C Face Serum, BrewMate French Press, PowerFlex Yoga Mat और The Quiet Horizon शामिल हैं।",
+        "ta": "பிரபலமான தேர்வுகள் Nova X Pro Smartphone, FlexRun Running Shoes, GlowPure Vitamin C Face Serum, BrewMate French Press, PowerFlex Yoga Mat, The Quiet Horizon.",
+        "te": "ప్రజాదరణ పొందినవి Nova X Pro Smartphone, FlexRun Running Shoes, GlowPure Vitamin C Face Serum, BrewMate French Press, PowerFlex Yoga Mat, The Quiet Horizon.",
+    },
+    "warranty": {
+        "en": "Electronics include a 1-year manufacturer warranty. Check the product listing for the exact coverage and exclusions.",
+        "kn": "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್‌ಗೆ ತಯಾರಕರ 1 ವರ್ಷದ ವಾರಂಟಿ ಇದೆ. ನಿಖರ ವ್ಯಾಪ್ತಿ ಮತ್ತು ಹೊರತಾಗುವಿಕೆಗಳಿಗೆ ಉತ್ಪನ್ನ ಪಟ್ಟಿ ನೋಡಿ.",
+        "hi": "इलेक्ट्रॉनिक्स पर निर्माता की 1 साल की वारंटी है। कवरेज और अपवादों के लिए उत्पाद सूची देखें।",
+        "ta": "எலக்ட்ரானிக்ஸ் பொருட்களுக்கு உற்பத்தியாளரின் 1 ஆண்டு உத்தரவாதம் உண்டு. விதிவிலக்குகளுக்கு தயாரிப்பு பட்டியலைப் பார்க்கவும்.",
+        "te": "ఎలక్ట్రానిక్స్‌కు తయారీదారు 1 సంవత్సరం వారంటీ ఉంటుంది. కవరేజ్, మినహాయింపులకు ఉత్పత్తి జాబితా చూడండి.",
+    },
+    "damaged": {
+        "en": "Report a damaged or defective delivery in My Orders within 7 days. Eligible items receive a replacement after verification.",
+        "kn": "ಹಾನಿಗೊಂಡ ಅಥವಾ ದೋಷಯುಕ್ತ ವಸ್ತುವನ್ನು 7 ದಿನಗಳೊಳಗೆ My Orders ನಲ್ಲಿ ವರದಿ ಮಾಡಿ. ಪರಿಶೀಲನೆಯ ನಂತರ ಅರ್ಹ ವಸ್ತು ಬದಲಾಯಿಸಲಾಗುತ್ತದೆ.",
+        "hi": "क्षतिग्रस्त या खराब वस्तु की सूचना 7 दिनों में My Orders में दें। जाँच के बाद पात्र वस्तु बदली जाएगी।",
+        "ta": "சேதமடைந்த அல்லது பழுதான பொருளை 7 நாட்களுக்குள் My Orders-இல் தெரிவிக்கவும். சரிபார்த்த பின் தகுதியுள்ள பொருள் மாற்றப்படும்.",
+        "te": "దెబ్బతిన్న లేదా లోపభూయిష్ట వస్తువును 7 రోజుల్లో My Ordersలో నివేదించండి. తనిఖీ తర్వాత అర్హమైన వస్తువును మారుస్తాం.",
+    },
+    "support": {
+        "en": "24/7 AI voice and text chat is available here. Call toll-free 1800-123-4567 or email support@smartecommerce.ai for customer support.",
+        "kn": "24/7 AI ಧ್ವನಿ ಮತ್ತು ಪಠ್ಯ ಚಾಟ್ ಇಲ್ಲಿ ಲಭ್ಯವಿದೆ. ಗ್ರಾಹಕ ಸಹಾಯಕ್ಕೆ ಟೋಲ್-ಫ್ರೀ 1800-123-4567 ಕರೆಮಾಡಿ ಅಥವಾ support@smartecommerce.ai ಗೆ ಇಮೇಲ್ ಮಾಡಿ.",
+        "hi": "24/7 AI वॉइस और टेक्स्ट चैट यहाँ उपलब्ध है। सहायता के लिए टोल-फ्री 1800-123-4567 पर कॉल करें या support@smartecommerce.ai पर ईमेल करें।",
+        "ta": "24/7 AI குரல் மற்றும் உரை அரட்டை இங்கே கிடைக்கும். உதவிக்கு கட்டணமில்லா 1800-123-4567 அல்லது support@smartecommerce.ai-ஐ தொடர்புகொள்ளுங்கள்.",
+        "te": "24/7 AI వాయిస్, టెక్స్ట్ చాట్ ఇక్కడ అందుబాటులో ఉన్నాయి. సహాయం కోసం టోల్-ఫ్రీ 1800-123-4567కు కాల్ చేయండి లేదా support@smartecommerce.aiకు ఇమెయిల్ చేయండి.",
+    },
+    "greeting": {
+        "en": "Hello! Ask me about delivery, returns, payments, orders, offers, products, warranty, or support.",
+        "kn": "ನಮಸ್ಕಾರ! ಡೆಲಿವರಿ, ರಿಟರ್ನ್, ಪಾವತಿ, ಆರ್ಡರ್, ಆಫರ್, ಉತ್ಪನ್ನ, ವಾರಂಟಿ ಅಥವಾ ಸಹಾಯದ ಬಗ್ಗೆ ಕೇಳಿ.",
+        "hi": "नमस्ते! डिलीवरी, रिटर्न, भुगतान, ऑर्डर, ऑफ़र, उत्पाद, वारंटी या सहायता के बारे में पूछें।",
+        "ta": "வணக்கம்! விநியோகம், திரும்பப்பெறுதல், கட்டணம், ஆர்டர், சலுகை, பொருள், உத்தரவாதம் அல்லது உதவி பற்றி கேளுங்கள்.",
+        "te": "నమస్కారం! డెలివరీ, రిటర్న్, చెల్లింపులు, ఆర్డర్లు, ఆఫర్లు, ఉత్పత్తులు, వారంటీ లేదా సహాయం గురించి అడగండి.",
+    },
+    "thanks": {
+        "en": "You're welcome. I can help with delivery, returns, payments, order tracking, offers, products, warranty, and support.",
+        "kn": "ಸ್ವಾಗತ. ಡೆಲಿವರಿ, ರಿಟರ್ನ್, ಪಾವತಿ, ಆರ್ಡರ್ ಟ್ರ್ಯಾಕಿಂಗ್, ಆಫರ್, ಉತ್ಪನ್ನ, ವಾರಂಟಿ ಮತ್ತು ಸಹಾಯಕ್ಕೆ ನಾನು ನೆರವಾಗುತ್ತೇನೆ.",
+        "hi": "आपका स्वागत है। मैं डिलीवरी, रिटर्न, भुगतान, ऑर्डर ट्रैकिंग, ऑफ़र, उत्पाद, वारंटी और सहायता में मदद कर सकता हूँ।",
+        "ta": "வரவேற்கிறோம். விநியோகம், திரும்பப்பெறுதல், கட்டணம், ஆர்டர் கண்காணிப்பு, சலுகை, பொருள், உத்தரவாதம், உதவிக்கு நான் உதவுவேன்.",
+        "te": "స్వాగతం. డెలివరీ, రిటర్న్, చెల్లింపులు, ఆర్డర్ ట్రాకింగ్, ఆఫర్లు, ఉత్పత్తులు, వారంటీ, సపోర్ట్‌లో సహాయం చేస్తాను.",
+    },
+    "app": {
+        "en": "This app combines product recommendations, a multilingual voice/text shopping assistant, and a sample-based fake-review detector.",
+        "kn": "ಈ ಆ್ಯಪ್ ಉತ್ಪನ್ನ ಶಿಫಾರಸು, ಬಹುಭಾಷಾ ಧ್ವನಿ/ಪಠ್ಯ ಸಹಾಯಕ ಮತ್ತು ಮಾದರಿ ಆಧಾರಿತ ನಕಲಿ ವಿಮರ್ಶೆ ಪತ್ತೆಹಚ್ಚುವಿಕೆಯನ್ನು ಒಳಗೊಂಡಿದೆ.",
+        "hi": "इस ऐप में उत्पाद सुझाव, बहुभाषी वॉइस/टेक्स्ट सहायक और नमूना-आधारित नकली समीक्षा पहचान शामिल है।",
+        "ta": "இந்த செயலியில் தயாரிப்பு பரிந்துரை, பன்மொழி குரல்/உரை உதவியாளர், மாதிரி அடிப்படையிலான போலி மதிப்புரை கண்டறிதல் உள்ளன.",
+        "te": "ఈ యాప్‌లో ఉత్పత్తి సిఫార్సులు, బహుభాషా వాయిస్/టెక్స్ట్ సహాయకుడు, నమూనా ఆధారిత నకిలీ సమీక్ష గుర్తింపు ఉన్నాయి.",
+    },
+    "reviews": {
+        "en": "Paste a review in the Fake Review Detector tab. Its sample-trained model estimates whether the text looks genuine or suspicious; it is not definitive.",
+        "kn": "Fake Review Detector ಟ್ಯಾಬ್‌ನಲ್ಲಿ ವಿಮರ್ಶೆ ಅಂಟಿಸಿ. ಮಾದರಿ ತರಬೇತಿ ಪಡೆದ ಮಾದರಿ ನಿಜವಾದ ಅಥವಾ ಅನುಮಾನಾಸ್ಪದ ಎಂದು ಅಂದಾಜಿಸುತ್ತದೆ; ಇದು ಅಂತಿಮ ತೀರ್ಪಲ್ಲ.",
+        "hi": "Fake Review Detector टैब में समीक्षा डालें। नमूना-प्रशिक्षित मॉडल उसके वास्तविक या संदिग्ध होने का अनुमान देता है, अंतिम निर्णय नहीं।",
+        "ta": "Fake Review Detector தாவலில் மதிப்புரையை ஒட்டவும். மாதிரி பயிற்சி பெற்ற மாடல் உண்மையா சந்தேகத்திற்குரியதா என மதிப்பிடும்; இது இறுதி முடிவு அல்ல.",
+        "te": "Fake Review Detector ట్యాబ్‌లో సమీక్షను అతికించండి. నమూనాతో శిక్షణ పొందిన మోడల్ నిజమైనదా అనుమానాస్పదమా అని అంచనా వేస్తుంది; ఇది తుది తీర్పు కాదు.",
+    },
+}
+
+FAQ_KNOWLEDGE_BASE = [
+    {"answer": "services", "questions": ("what services do you provide", "what can this store do", "ನಿಮ್ಮ ಸೇವೆಗಳು ಯಾವುವು", "आपकी सेवाएं क्या हैं", "உங்கள் சேவைகள் என்ன", "మీ సేవలు ఏమిటి"), "keywords": ("services", "features", "ಸೇವೆಗಳು", "सेवाएं", "சேவைகள்", "సేవలు")},
+    {"answer": "delivery", "questions": ("how long does delivery take", "shipping time", "ಡೆಲಿವರಿ ಎಷ್ಟು ದಿನ", "ಡெಲಿವರಿ ಎಷ್ಟು ದಿನ", "डिलीवरी में कितना समय", "डिलीवरी कितने दिन में होगी", "டெலிவரி எத்தனை நாள்", "டெலிவரி எத்தனை நாட்கள்", "డెలివరీ ఎన్ని రోజులు", "డెలివరీ ఎన్ని రోజుల్లో"), "keywords": ("delivery", "shipping time", "ಎಷ್ಟು ದಿನ", "ಕितने दिन", "डिलीवरी", "कितना समय", "எத்தனை நாள்", "டெலிவரி", "ఎన్ని రోజులు", "డెలివరీ")},
+    {"answer": "shipping_fee", "questions": ("is shipping free", "free delivery above what amount", "ಉಚಿತ ಡೆಲಿವರಿ ಎಷ್ಟು ರೂಪಾಯಿಗೆ", "मुफ्त डिलीवरी कितने पर", "இலவச விநியோகம் எவ்வளவு", "ఉచిత డెలివరీ ఎంతకు"), "keywords": ("shipping fee", "free delivery", "ಉಚಿತ ಡೆಲಿವರಿ", "मुफ्त डिलीवरी", "இலவச விநியோகம்", "ఉచిత డెలివరీ")},
+    {"answer": "delivery", "questions": ("do you deliver to Mysore", "shipping to Bengaluru Karnataka", "ಮೈಸೂರಿಗೆ ಡೆಲಿವರಿ ಇದೆಯೇ", "क्या मैसूर में डिलीवरी है", "பெங்களூருக்கு அனுப்புவீர்களா", "మైసూరులో డెలివరీ ఉందా"), "keywords": ("mysore", "mysuru", "ಮೈಸೂರು", "मैसूर", "ಮೈಸೂರು", "मैसூர்", "பெங்களூர்", "బెంగళూరు")},
+    {"answer": "returns", "questions": ("what is your return policy", "can I return within seven days", "ರಿಟರ್ನ್ ಪಾಲಿಸಿ ಏನು", "रिटर्न पॉलिसी क्या है", "ரிட்டர்ன் விதிமுறை என்ன", "రిటర్న్ పాలసీ ఏమిటి"), "keywords": ("returns", "return policy", "ರಿಟರ್ನ್", "ಹಿಂತಿರುಗಿಸಿ", "रिटर्न", "रिटर्न")},
+    {"answer": "returns", "questions": ("are returns no questions asked", "easy returns", "ಯಾವುದೇ ಪ್ರಶ್ನೆ ಇಲ್ಲದೆ ವಾಪಸ್ ಮಾಡಬಹುದೇ", "बिना सवाल वापसी", "கேள்வியின்றி திருப்பலாமா", "ప్రశ్నలు లేకుండా తిరిగి ఇవ్వవచ్చా"), "keywords": ("no questions asked", "easy return", "ಯಾವುದೇ ಪ್ರಶ್ನೆ", "बिना सवाल", "கேள்வியின்றி", "ప్రశ్నలు లేకుండా")},
+    {"answer": "returns", "questions": ("how do I schedule a return pickup", "instant pickup for returns", "ರಿಟರ್ನ್ ಪಿಕಪ್ ಹೇಗೆ", "रिटर्न पिकअप कैसे करें", "திரும்பப் பெற பிக்கப் எப்படி", "రిటర్న్ పికప్ ఎలా"), "keywords": ("pickup", "pick up", "ಪಿಕಪ್", "पिकअप", "பிக்கப்", "పికప్")},
+    {"answer": "refund", "questions": ("when will my refund arrive", "refund processing time", "ರಿಫಂಡ್ ಯಾವಾಗ ಬರುತ್ತದೆ", "रिफंड कब मिलेगा", "பணம் எப்போது திரும்பும்", "రీఫండ్ ఎప్పుడు వస్తుంది"), "keywords": ("refund", "money back", "ರಿಫಂಡ್", "ಮರುಪಾವತಿ", "रिफंड", "ரீஃபண்ட்", "రీఫండ్")},
+    {"answer": "exchange", "questions": ("can I exchange an item", "how do exchanges work", "ವಸ್ತು ಬದಲಾಯಿಸಬಹುದೇ", "क्या सामान बदल सकते हैं", "பொருளை மாற்ற முடியுமா", "వస్తువును మార్చవచ్చా"), "keywords": ("exchange", "swap", "ಬದಲಾಯಿಸಿ", "ಬದಲಾವಣೆ", "एक्सचेंज", "மாற்ற", "మార్పిడి")},
+    {"answer": "payments", "questions": ("what payment methods do you accept", "how can I pay", "ಯಾವ ಪಾವತಿ ವಿಧಾನಗಳು", "कौन से पेमेंट तरीके", "என்ன கட்டண முறைகள்", "ఏ చెల్లింపు పద్ధతులు"), "keywords": ("payment methods", "pay", "ಪೇಮೆಂಟ್", "ಪಾವತಿ", "पेमेंट", "भुगतान", "கட்டணம்", "చెల్లింపు")},
+    {"answer": "payments", "questions": ("can I pay using UPI GPay PhonePe or Paytm", "do you accept cards and net banking", "UPI GPay PhonePe ಸ್ವೀಕರಿಸುತ್ತೀರಾ", "क्या GPay PhonePe लेते हैं", "GPay PhonePe ஏற்கிறீர்களா", "GPay PhonePe తీసుకుంటారా"), "keywords": ("upi", "gpay", "google pay", "phonepe", "paytm", "card", "net banking", "ಜಿಪೇ", "ಯುಪಿಐ", "फोनपे", "पेमेंट", "யுபிஐ", "ఫోన్ పే")},
+    {"answer": "payments", "questions": ("is cash on delivery available", "can I pay cash when it arrives", "ಕ್ಯಾಶ್ ಆನ್ ಡೆಲಿವರಿ ಇದೆಯೇ", "कैश ऑन डिलीवरी है", "பணம் செலுத்தி பெறலாமா", "క్యాష్ ఆన్ డెలివరీ ఉందా"), "keywords": ("cash on delivery", "cod", "pay cash", "ಕ್ಯಾಶ್ ಆನ್ ಡೆಲಿವರಿ", "नकद", "பணம் செலுத்தி", "క్యాష్")},
+    {"answer": "tracking", "questions": ("how can I track my order", "where is my order", "ನನ್ನ ಆರ್ಡರ್ ಎಲ್ಲಿ", "मेरा ऑर्डर कहां है", "என் ஆர்டர் எங்கே", "నా ఆర్డర్ ఎక్కడ"), "keywords": ("track order", "order status", "order id", "ಆರ್ಡರ್ ಟ್ರ್ಯಾಕ್", "ಆರ್ಡರ್ ಎಲ್ಲಿ", "ऑर्डर ट्रैक", "ஆர்டர் எங்கே", "ఆర్డర్ ఎక్కడ")},
+    {"answer": "cancel", "questions": ("can I cancel before dispatch", "how do I cancel an order", "ರವಾನೆಗೆ ಮೊದಲು ಆರ್ಡರ್ ರದ್ದು ಮಾಡಬಹುದೇ", "डिस्पैच से पहले रद्द कर सकते हैं", "அனுப்பும் முன் ரத்து செய்யலாமா", "పంపే ముందు రద్దు చేయవచ్చా"), "keywords": ("cancel", "cancellation", "dispatch", "ರದ್ದು", "ರದ್ದುಮಾಡಿ", "रद्द", "ரத்து", "రద్దు")},
+    {"answer": "offers", "questions": ("do you have a first order discount", "WELCOME10 coupon", "ಮೊದಲ ಆರ್ಡರ್ ರಿಯಾಯಿತಿ ಇದೆಯೇ", "पहले ऑर्डर पर छूट", "முதல் ஆர்டருக்கு தள்ளுபடி", "మొదటి ఆర్డర్ తగ్గింపు"), "keywords": ("first order", "welcome10", "discount", "coupon", "ಡಿಸ್ಕೌಂಟ್", "ಆಫರ್", "छूट", "कूपन", "தள்ளுபடி", "కూపన్")},
+    {"answer": "offers", "questions": ("what seasonal offers are available", "any coupons or sale", "ಋತುಮಾನದ ಆಫರ್ ಇದೆಯೇ", "सेल या कूपन है", "சலுகை அல்லது கூப்பன் உள்ளதா", "ఆఫర్లు లేదా కూపన్లు ఉన్నాయా"), "keywords": ("seasonal", "offer", "coupon", "sale", "ಆಫರ್", "கூப்பன்", "కూపన్")},
+    {"answer": "catalog", "questions": ("what categories do you sell", "what is in your catalog", "ನಿಮ್ಮ ಕ್ಯಾಟಲಾಗ್‌ನಲ್ಲಿ ಏನಿದೆ", "आपके कैटलॉग में क्या है", "உங்கள் பட்டியலில் என்ன உள்ளது", "మీ కేటలాగ్‌లో ఏమున్నాయి"), "keywords": ("catalog", "categories", "products", "ಕ್ಯಾಟಲಾಗ್", "ವಿಭಾಗ", "कैटलॉग", "श्रेणियां", "பட்டியல்", "కేటలాగ్")},
+    {"answer": "starting_price", "questions": ("what is the cheapest item", "what is the starting price", "ಕಡಿಮೆ ಬೆಲೆ ಎಷ್ಟು", "सबसे कम कीमत क्या है", "குறைந்த விலை என்ன", "అత్యల్ప ధర ఎంత"), "keywords": ("starting price", "cheapest", "lowest price", "ಬೆಲೆ", "ಕಡಿಮೆ ಬೆಲೆ", "कीमत", "सबसे कम", "குறைந்த விலை", "అత్యల్ప ధర")},
+    {"answer": "recommendations", "questions": ("how does product recommendation work", "suggest similar products", "ಶಿಫಾರಸು ಹೇಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ", "उत्पाद सुझाव कैसे मिलते हैं", "பரிந்துரை எப்படி செயல்படும்", "సిఫార్సులు ఎలా పనిచేస్తాయి"), "keywords": ("recommendation", "similar products", "ಶಿಫಾರಸು", "सुझाव", "பரிந்துரை", "సిఫార్సు")},
+    {"answer": "bestsellers", "questions": ("what are your best sellers", "popular products in each category", "ಜನಪ್ರಿಯ ಉತ್ಪನ್ನಗಳು ಯಾವುವು", "सबसे लोकप्रिय उत्पाद कौन से हैं", "பிரபலமான பொருட்கள் எவை", "పాపులర్ ఉత్పత్తులు ఏవి"), "keywords": ("best seller", "popular products", "top items", "ಜನಪ್ರಿಯ", "लोकप्रिय", "பிரபலமான", "ప్రజాదరణ")},
+    {"answer": "warranty", "questions": ("what warranty do electronics have", "is there a one year warranty", "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್‌ಗೆ ವಾರಂಟಿ ಇದೆಯೇ", "इलेक्ट्रॉनिक्स की वारंटी कितनी है", "எலக்ட்ரானிக்ஸ் உத்தரவாதம்", "ఎలక్ట్రానిక్స్ వారంటీ ఎంత"), "keywords": ("warranty", "guarantee", "ವಾರಂಟಿ", "ಖಾತರಿ", "वारंटी", "உத்தரவாதம்", "వారంటీ")},
+    {"answer": "damaged", "questions": ("my item arrived damaged", "how do I replace a defective product", "ಹಾನಿಗೊಂಡ ವಸ್ತು ಬದಲಾಯಿಸಿ", "खराब सामान बदलना है", "சேதமான பொருளை மாற்ற வேண்டும்", "దెబ్బతిన్న వస్తువు మార్చాలి"), "keywords": ("damaged", "defective", "replacement", "broken", "ಹಾನಿಗೊಂಡ", "ದೋಷ", "खराब", "क्षतिग्रस्त", "சேதம்", "దెబ్బతిన్న")},
+    {"answer": "support", "questions": ("how do I contact customer support", "customer care phone and email", "ಗ್ರಾಹಕ ಸೇವೆಯನ್ನು ಹೇಗೆ ಸಂಪರ್ಕಿಸಲಿ", "ग्राहक सेवा से कैसे संपर्क करें", "வாடிக்கையாளர் சேவையை எப்படி தொடர்பு கொள்வது", "కస్టమర్ కేర్‌ను ఎలా సంప్రదించాలి"), "keywords": ("customer support", "customer care", "contact", "helpline", "ಗ್ರಾಹಕ ಸೇವೆ", "ಸಂಪರ್ಕ", "ग्राहक सेवा", "संपर्क", "வாடிக்கையாளர் சேவை", "సంప్రదించండి")},
+    {"answer": "support", "questions": ("is chat available 24 hours", "are you open 24/7", "24/7 ಸಹಾಯ ಇದೆಯೇ", "क्या चैट 24 घंटे उपलब्ध है", "24 மணி நேர ஆதரவு உள்ளதா", "24 గంటల సహాయం ఉందా"), "keywords": ("24/7", "24 hours", "always available", "24 ಗಂಟೆ", "24 घंटे", "24 மணி", "24 గంటలు")},
+    {"answer": "greeting", "questions": ("hello", "good morning", "ನಮಸ್ಕಾರ", "नमस्ते", "வணக்கம்", "నమస్కారం"), "keywords": ("hello", "hi", "hey", "ನಮಸ್ಕಾರ", "ನಮಸ್ತೆ", "नमस्ते", "வணக்கம்", "హలో")},
+    {"answer": "thanks", "questions": ("thank you", "thanks for your help", "ಧನ್ಯವಾದಗಳು", "धन्यवाद", "நன்றி", "ధన్యవాదాలు"), "keywords": ("thanks", "thank you", "ಧನ್ಯವಾದ", "ಧನ್ಯವಾದಗಳು", "धन्यवाद", "நன்றி", "ధన్యవాదాలు")},
+    {"answer": "app", "questions": ("what is this app", "what features does this app have", "ಈ ಆ್ಯಪ್ ಏನು ಮಾಡುತ್ತದೆ", "यह ऐप क्या करता है", "இந்த செயலி என்ன செய்கிறது", "ఈ యాప్ ఏమి చేస్తుంది"), "keywords": ("app", "application", "features", "ಆ್ಯಪ್", "ಸೌಲಭ್ಯ", "ऐप", "सुविधाएं", "செயலி", "యాప్")},
+    {"answer": "reviews", "questions": ("how do I check a fake review", "what does the review detector do", "ನಕಲಿ ವಿಮರ್ಶೆ ಹೇಗೆ ಪರಿಶೀಲಿಸಲಿ", "फर्जी समीक्षा कैसे जांचें", "போலி மதிப்புரையை எப்படி சரிபார்ப்பது", "నకిలీ సమీక్షను ఎలా తనిఖీ చేయాలి"), "keywords": ("fake review", "review detector", "ನಕಲಿ ವಿಮರ್ಶೆ", "फर्जी समीक्षा", "போலி மதிப்புரை", "నకిలీ సమీక్ష")},
+    {"answer": "catalog", "questions": ("do you sell electronics and fashion", "do you have books beauty and sports items", "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್ ಮತ್ತು ಫ್ಯಾಷನ್ ಇದೆಯೇ", "क्या किताबें और ब्यूटी उत्पाद हैं", "புத்தகங்கள் அழகு பொருட்கள் உள்ளனவா", "పుస్తకాలు బ్యూటీ వస్తువులు ఉన్నాయా"), "keywords": ("electronics", "fashion", "beauty", "books", "sports", "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್", "ಫ್ಯಾಷನ್", "ಪುಸ್ತಕ", "किताब", "புத்தகம்", "పుస్తకాలు")},
+    {"answer": "tracking", "questions": ("where can I find tracking number", "track using order ID", "Order ID ಮೂಲಕ ಟ್ರ್ಯಾಕ್ ಮಾಡುವುದು ಹೇಗೆ", "Order ID से ट्रैक कैसे करें", "Order ID மூலம் கண்காணிப்பது எப்படி", "Order IDతో ఎలా ట్రాక్ చేయాలి"), "keywords": ("tracking number", "order id", "track", "ಟ್ರ್ಯಾಕ್", "ऑर्डर ID", "கண்காணிப்பு", "ట్రాక్")},
+    {"answer": "refund", "questions": ("how many days for refund credit", "refund to original payment method", "ಮೂಲ ಪಾವತಿಗೆ ರಿಫಂಡ್ ಯಾವಾಗ", "मूल भुगतान में रिफंड कब", "அசல் கட்டணத்திற்கு பணம் எப்போது", "అసలు చెల్లింపుకు రీఫండ్ ఎప్పుడు"), "keywords": ("refund credited", "business days", "ಮೂಲ ಪಾವತಿ", "ರಿಫಂಡ್", "रिफंड", "மூல கட்டணம்", "రీఫండ్")},
+    {"answer": "offers", "questions": ("WELCOME10 gives how much off", "first purchase promo code", "WELCOME10 ಎಷ್ಟು ರಿಯಾಯಿತಿ", "WELCOME10 छूट कितनी", "WELCOME10 தள்ளுபடி எவ்வளவு", "WELCOME10 తగ్గింపు ఎంత"), "keywords": ("welcome10", "first order", "10% off", "coupon", "ರಿಯಾಯಿತಿ", "छूट", "தள்ளுபடி", "తగ్గింపు")},
+    {"answer": "recommendations", "questions": ("how many similar products are recommended", "where is the recommender tab", "ಎಷ್ಟು ಹೋಲುವ ಉತ್ಪನ್ನಗಳು", "कितने समान उत्पाद दिखते हैं", "எத்தனை ஒத்த பொருட்கள்", "ఎన్ని సారూప్య ఉత్పత్తులు"), "keywords": ("three recommendations", "similar products", "recommender tab", "ಹೋಲುವ ಉತ್ಪನ್ನ", "समान उत्पाद", "ஒத்த பொருட்கள்", "సారూప్య")},
+    {"answer": "damaged", "questions": ("replacement for damaged item in seven days", "item is broken what should I do", "7 ದಿನಗಳಲ್ಲಿ ಹಾನಿಗೊಂಡ ವಸ್ತು ಬದಲಾವಣೆ", "7 दिन में खराब सामान बदलना", "7 நாட்களில் சேதமான பொருள் மாற்றம்", "7 రోజుల్లో దెబ్బతిన్న వస్తువు మార్పిడి"), "keywords": ("damaged replacement", "seven day replacement", "ಹಾನಿಗೊಂಡ", "ಬದಲಾವಣೆ", "खराब सामान", "சேதமான", "దెబ్బతిన్న")},
+    {"answer": "support", "questions": ("what is the toll free number", "what is support email", "ಟೋಲ್ ಫ್ರೀ ಸಂಖ್ಯೆ ಏನು", "टोल फ्री नंबर क्या है", "கட்டணமில்லா எண் என்ன", "టోల్ ఫ్రీ నంబర్ ఏమిటి"), "keywords": ("1800-123-4567", "support@smartecommerce.ai", "toll free", "ಟೋಲ್ ಫ್ರೀ", "टोल फ्री", "கட்டணமில்லா", "టోల్ ఫ్రీ")},
+    {"answer": "payments", "questions": ("is payment secure", "are card payments safe", "ಪಾವತಿ ಸುರಕ್ಷಿತವೇ", "क्या भुगतान सुरक्षित है", "கட்டணம் பாதுகாப்பானதா", "చెల్లింపు సురక్షితమేనా"), "keywords": ("secure payment", "safe payment", "ಸುರಕ್ಷಿತ ಪಾವತಿ", "सुरक्षित भुगतान", "பாதுகாப்பான கட்டணம்", "సురక్షిత చెల్లింపు")},
+    {"answer": "delivery", "questions": ("do you ship all over India", "how fast is delivery across India", "ಭಾರತದಾದ್ಯಂತ ಶಿಪ್ಪಿಂಗ್ ಇದೆಯೇ", "क्या पूरे भारत में शिपिंग है", "இந்தியா முழுவதும் விநியோகம் உள்ளதா", "భారతదేశం అంతటా డెలివరీ ఉందా"), "keywords": ("all India", "across India", "भारत भर", "ದೇಶಾದ್ಯಂತ", "இந்தியா முழுவதும்", "భారతదేశం అంతటా")},
+    {"answer": "returns", "questions": ("do you offer seven day easy returns", "is there a return window", "7 ದಿನದ ರಿಟರ್ನ್ ಇದೆಯೇ", "7 दिन की वापसी है", "7 நாள் திரும்பப்பெறுதல் உள்ளதா", "7 రోజుల రిటర్న్ ఉందా"), "keywords": ("7 day return", "return window", "ಏಳು ದಿನ", "7 ದಿನ", "7 दिन", "7 நாள்", "7 రోజులు")},
+    {"answer": "cancel", "questions": ("is cancellation free before shipping", "cancel order before dispatch", "ರವಾನೆಗೂ ಮೊದಲು ರದ್ದು ಉಚಿತವೇ", "भेजने से पहले रद्द करना मुफ्त है", "அனுப்பும் முன் ரத்து இலவசமா", "పంపే ముందు రద్దు ఉచితమా"), "keywords": ("free cancellation", "before dispatch", "ರದ್ದು", "ರವಾನೆ", "रद्द", "அனுப்பும் முன்", "రద్దు")},
+    {"answer": "bestsellers", "questions": ("best product in electronics category", "popular picks for books and fitness", "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್‌ನಲ್ಲಿ ಜನಪ್ರಿಯ ಯಾವುದು", "इलेक्ट्रॉनिक्स में लोकप्रिय क्या है", "எலக்ட்ரானிக்ஸில் பிரபலமானது", "ఎలక్ట్రానిక్స్‌లో పాపులర్ ఏది"), "keywords": ("best product", "popular", "best seller", "ಜನಪ್ರಿಯ", "लोकप्रिय", "பிரபலமான", "పాపులర్")},
+    {"answer": "greeting", "questions": ("can you help me shop", "I need shopping help", "ಶಾಪಿಂಗ್ ಸಹಾಯ ಮಾಡುತ್ತೀರಾ", "खरीदारी में मदद करेंगे", "ஷாப்பிங் உதவி செய்ய முடியுமா", "షాపింగ్‌లో సహాయం చేస్తారా"), "keywords": ("help me", "shopping help", "ಸಹಾಯ", "मदद", "உதவி", "సహాయం")},
+    {"answer": "services", "questions": ("do you have an AI voice assistant", "can I speak to the shopping assistant", "AI ಧ್ವನಿ ಸಹಾಯಕ ಇದೆಯೇ", "क्या AI वॉइस सहायक है", "AI குரல் உதவியாளர் உள்ளதா", "AI వాయిస్ అసిస్టెంట్ ఉందా"), "keywords": ("voice assistant", "AI assistant", "ಧ್ವನಿ ಸಹಾಯಕ", "वॉइस सहायक", "குரல் உதவியாளர்", "వాయిస్ అసిస్టెంట్")},
+    {"answer": "catalog", "questions": ("are there twenty products", "how many products are in the store", "ಅಂಗಡಿಯಲ್ಲಿ ಎಷ್ಟು ಉತ್ಪನ್ನಗಳಿವೆ", "स्टोर में कितने उत्पाद हैं", "கடையில் எத்தனை பொருட்கள்", "స్టోర్‌లో ఎన్ని ఉత్పత్తులు"), "keywords": ("20 products", "how many products", "ಎಷ್ಟು ಉತ್ಪನ್ನ", "कितने उत्पाद", "எத்தனை பொருட்கள்", "ఎన్ని ఉత్పత్తులు")},
+    {"answer": "starting_price", "questions": ("is there anything under five hundred rupees", "what is the minimum product price", "₹500 ಕ್ಕಿಂತ ಕಡಿಮೆ ವಸ್ತು ಇದೆಯೇ", "₹500 से कम का सामान", "₹500-க்கு குறைவான பொருள்", "₹500 కంటే తక్కువ వస్తువు"), "keywords": ("minimum price", "starting at", "cheapest", "ಕಡಿಮೆ ಬೆಲೆ", "न्यूनतम कीमत", "குறைந்த விலை", "కనిష్ట ధర")},
+]
+
+FAQ_KNOWLEDGE_BASE[1]["keywords"] += (
+    "ഡെലിവറി", "കിതنے دن", "कितने दिन", "டெலிவரி", "ఎన్ని రోజులు",
+)
+FAQ_KNOWLEDGE_BASE[2]["keywords"] += (
+    "₹499", "above ₹499", "over ₹499", "मुफ्त डिलीवरी", "ಇலவச டெலிவரி",
+)
+
+FAQ_ANSWER_INTENT = {
+    "services": "services",
+    "delivery": "shipping",
+    "shipping_fee": "shipping_fee",
+    "returns": "returns",
+    "exchange": "returns",
+    "refund": "returns",
+    "payments": "payments",
+    "tracking": "tracking",
+    "cancel": "tracking",
+    "offers": "offers",
+    "catalog": "catalog",
+    "starting_price": "catalog",
+    "recommendations": "catalog",
+    "bestsellers": "catalog",
+    "warranty": "warranty",
+    "damaged": "warranty",
+    "support": "support",
+    "greeting": "greeting",
+    "thanks": "thanks",
+    "app": "services",
+    "reviews": "services",
+}
+
+PRODUCT_DETAIL_TEMPLATES = {
+    "en": "{name} — {category}, ₹{price:,}. {description}",
+    "kn": "{name} — {category}, ₹{price:,}. {description}",
+    "hi": "{name} — {category}, ₹{price:,}। {description}",
+    "ta": "{name} — {category}, ₹{price:,}. {description}",
+    "te": "{name} — {category}, ₹{price:,}. {description}",
+}
+
+PRODUCT_DESCRIPTION_TRANSLATIONS = {
+    "kn": {
+        "Nova X Pro Smartphone": "AMOLED ಪರದೆ, ವೇಗದ ಪ್ರೊಸೆಸರ್, ದೀರ್ಘ ಬ್ಯಾಟರಿ ಮತ್ತು ಹೆಚ್ಚಿನ ರೆಸಲ್ಯೂಶನ್ ಕ್ಯಾಮೆರಾವಿರುವ 5G ಸ್ಮಾರ್ಟ್‌ಫೋನ್.",
+        "SonicBeat Wireless Headphones": "ಆಕ್ಟಿವ್ ನಾಯ್ಸ್ ಕ್ಯಾನ್ಸಲೇಶನ್, ಸಮೃದ್ಧ ಬಾಸ್ ಮತ್ತು ದೀರ್ಘ ಬ್ಯಾಟರಿಯ ವೈರ್‌ಲೆಸ್ ಓವರ್-ಇಯರ್ ಹೆಡ್‌ಫೋನ್‌ಗಳು.",
+        "GlowPure Vitamin C Face Serum": "ದೈನಂದಿನ ತ್ವಚೆ ಆರೈಕೆಗೆ ತೇವಾಂಶ ನೀಡುವ, ಬೇಗ ಹೀರಿಕೊಳ್ಳುವ ವಿಟಮಿನ್ C ಮುಖದ ಸೀರಮ್.",
+    },
+    "hi": {
+        "Nova X Pro Smartphone": "AMOLED स्क्रीन, तेज़ प्रोसेसर, लंबी बैटरी और उच्च-रिज़ॉल्यूशन कैमरे वाला 5G स्मार्टफोन।",
+        "SonicBeat Wireless Headphones": "एक्टिव नॉइज़ कैंसलेशन, दमदार बास और लंबी बैटरी वाले वायरलेस ओवर-ईयर हेडफोन।",
+        "GlowPure Vitamin C Face Serum": "रोज़ाना त्वचा देखभाल के लिए हल्का, नमी देने वाला और जल्दी अवशोषित होने वाला विटामिन C सीरम।",
+    },
+    "ta": {
+        "Nova X Pro Smartphone": "AMOLED திரை, வேகமான செயலி, நீண்ட பேட்டரி மற்றும் உயர் தெளிவுத்திறன் கேமரா கொண்ட 5G ஸ்மார்ட்போன்.",
+        "SonicBeat Wireless Headphones": "சத்தத் தடுப்பு, செறிவான பாஸ், நீண்ட பேட்டரி கொண்ட வயர்லெஸ் ஓவர்-இயர் ஹெட்ஃபோன்கள்.",
+        "GlowPure Vitamin C Face Serum": "தினசரி சருமப் பராமரிப்புக்கான ஈரப்பதமூட்டும், விரைவாக உறிஞ்சும் வைட்டமின் C சீரம்.",
+    },
+    "te": {
+        "Nova X Pro Smartphone": "AMOLED డిస్‌ప్లే, వేగవంతమైన ప్రాసెసర్, దీర్ఘ బ్యాటరీ, అధిక రిజల్యూషన్ కెమెరా ఉన్న 5G స్మార్ట్‌ఫోన్.",
+        "SonicBeat Wireless Headphones": "యాక్టివ్ నాయిస్ క్యాన్సలేషన్, బలమైన బాస్, దీర్ఘ బ్యాటరీతో వైర్‌లెస్ ఓవర్-ఇయర్ హెడ్‌ఫోన్లు.",
+        "GlowPure Vitamin C Face Serum": "రోజువారీ చర్మ సంరక్షణ కోసం తేమనిచ్చే, త్వరగా శోషించబడే విటమిన్ C సీరమ్.",
+    },
+}
+
+PRODUCT_QUERY_ALIASES = {
+    "Nova X Pro Smartphone": ("nova x pro", "nova smartphone", "smartphone", "mobile phone", "5g phone", "ಫೋನ್", "मोबाइल", "மொபைல்", "మొబైల్"),
+    "PixelView 4K Smart TV": ("pixelview", "4k smart tv", "smart tv", "television", "ಟಿವಿ", "टीवी", "தொலைக்காட்சி", "టీవీ"),
+    "SonicBeat Wireless Headphones": ("sonicbeat", "headphones", "wireless headphones", "earphones", "ಹೆಡ್‌ಫೋನ್", "हेडफोन", "ஹெட்ஃபோன்", "హెడ్‌ఫోన్స్"),
+    "ThunderMax Bluetooth Speaker": ("thundermax", "bluetooth speaker", "speaker", "ಸ್ಪೀಕರ್", "स्पीकर", "ஸ்பீக்கர்", "స్పీకర్"),
+    "Everyday Cotton Kurta": ("cotton kurta", "kurta", "ಕುರ್ತಾ", "कुर्ता", "குர்தா", "కుర్తా"),
+    "Classic Denim Jacket": ("denim jacket", "jacket", "ಡೆನಿಮ್ ಜಾಕೆಟ್", "जैकेट", "ஜாக்கெட்", "జాకెట్"),
+    "FlexRun Running Shoes": ("flexrun", "running shoes", "trainers", "ರನ್ನಿಂಗ್ ಶೂ", "रनिंग शू", "ஓடும் காலணி", "రన్నింగ్ షూస్"),
+    "Everyday Canvas Backpack": ("canvas backpack", "backpack", "rucksack", "ಬ್ಯಾಕ್‌ಪ್ಯಾಕ್", "बैग", "பேக்", "బ్యాక్‌ప్యాక్"),
+    "BrewMate French Press": ("brewmate", "french press", "coffee maker", "ಫ್ರೆಂಚ್ ಪ್ರೆಸ್", "कॉफी मेकर", "காபி மேக்கர்", "కాఫీ మేకర్"),
+    "ChefPro Nonstick Cookware Set": ("chefpro", "nonstick cookware", "cookware set", "cookware", "ನಾನ್‌ಸ್ಟಿಕ್ ಕುಕ್‌ವೇರ್", "कुकवेयर", "சமையல் பாத்திரம்", "కుక్‌వేర్"),
+    "CozyNest Cotton Bedsheet": ("cozynest", "cotton bedsheet", "bedsheet", "bed sheet", "ಬೆಡ್‌ಶೀಟ್", "बेडशीट", "படுக்கை விரிப்பு", "బెడ్‌షీట్"),
+    "GlowPure Vitamin C Face Serum": ("glowpure", "vitamin c face serum", "face serum", "serum", "ಸೀರಮ್", "सीरम", "சீரம்", "సీరమ్"),
+    "SilkShine Hair Care Kit": ("silkshine", "hair care kit", "shampoo", "conditioner", "ಹೇರ್ ಕೇರ್", "शैम्पू", "ஷாம்பு", "షాంపూ"),
+    "FreshBloom Eau de Parfum": ("freshbloom", "eau de parfum", "perfume", "fragrance", "ಪರ್ಫ್ಯೂಮ್", "इत्र", "வாசனை திரவியம்", "పెర్ఫ్యూమ్"),
+    "PulseFit Smartwatch": ("pulsefit", "smartwatch", "fitness watch", "ಸ್ಮಾರ್ಟ್‌ವಾಚ್", "स्मार्टवॉच", "ஸ்மார்ட்வாட்ச்", "స్మార్ట్‌వాచ్", "സ്മാർട്ട്‌വാച്ച്", "smart watch"),
+    "PowerFlex Yoga Mat": ("powerflex", "yoga mat", "exercise mat", "ಯೋಗ ಮ್ಯಾಟ್", "योगा मैट", "யோகா மேட்", "యోగా మ్యాట్"),
+    "ProGrip Adjustable Dumbbells": ("progrip", "adjustable dumbbells", "dumbbells", "weights", "ಡಂಬೆಲ್ಸ್", "डंबल", "டம்ப்பெல்ஸ்", "డంబెల్స్"),
+    "The Quiet Horizon": ("quiet horizon", "fiction novel", "the novel"),
+    "Everyday Personal Finance": ("personal finance", "finance book", "finance guide"),
+    "The Curious Science Handbook": ("curious science", "science handbook", "science book"),
+}
+
+def _faq_text(entry):
+    return " ".join(
+        (*entry["questions"], *entry["keywords"])
+    )
+
+
+@st.cache_resource
+def get_chatbot_faq_index():
+    vectorizer = TfidfVectorizer(
+        analyzer="char_wb",
+        ngram_range=(1, 2),
+        sublinear_tf=True,
+        lowercase=True,
+    )
+    matrix = vectorizer.fit_transform([_faq_text(entry) for entry in FAQ_KNOWLEDGE_BASE])
+    return vectorizer, matrix
+
+
+def _localized_faq_answer(answer_id, lang_code):
+    localized = CHATBOT_ANSWER_BANK.get(answer_id, {})
+    if lang_code in localized:
+        return localized[lang_code]
+
     responses = CHATBOT_RESPONSES.get(lang_code, CHATBOT_RESPONSES["en"])
     details = DETAIL_RESPONSES.get(lang_code, DETAIL_RESPONSES["en"])
+    legacy_answers = {
+        "delivery": responses["shipping"],
+        "returns": responses["returns"],
+        "payments": PAYMENT_RESPONSES.get(lang_code, PAYMENT_RESPONSES["en"]),
+        "tracking": details["tracking"],
+        "offers": details["offers"],
+        "warranty": WARRANTY_RESPONSES.get(lang_code, WARRANTY_RESPONSES["en"]),
+        "support": details["support"],
+        "greeting": responses["greeting"],
+        "thanks": details["thanks"],
+        "catalog": details["catalog"],
+        "starting_price": PRICE_PROMPTS.get(lang_code, PRICE_PROMPTS["en"]),
+        "refund": responses["returns"],
+        "exchange": responses["returns"],
+        "shipping_fee": responses["shipping"],
+        "cancel": details["tracking"],
+        "recommendations": details["catalog"],
+        "bestsellers": details["catalog"],
+        "damaged": WARRANTY_RESPONSES.get(lang_code, WARRANTY_RESPONSES["en"]),
+        "services": responses["general"],
+        "app": responses["general"],
+        "reviews": responses["general"],
+    }
+    return legacy_answers.get(answer_id, CHATBOT_ANSWER_BANK["services"]["en"])
 
-    def matches(keyword):
-        keyword = keyword.casefold().strip()
-        if not keyword:
+
+def answer_question(question, lang_code):
+    query = " ".join(question.casefold().split())
+    if not query:
+        return _localized_faq_answer("services", lang_code)
+
+    for entry in FAQ_KNOWLEDGE_BASE:
+        if any(" ".join(sample.casefold().split()) == query for sample in entry["questions"]):
+            return _localized_faq_answer(entry["answer"], lang_code)
+
+    def contains_phrase(phrase):
+        phrase = " ".join(phrase.casefold().split())
+        if not phrase:
             return False
-        if keyword.isascii() and all(char.isalnum() or char.isspace() for char in keyword):
-            return re.search(rf"(?<!\w){re.escape(keyword)}(?!\w)", query) is not None
-        return keyword in query
+        if phrase.isascii() and all(char.isalnum() or char.isspace() for char in phrase):
+            return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", query) is not None
+        return phrase in query
 
-    def has_intent(intent):
-        legacy_key = {"delivery": "shipping"}.get(intent, intent)
-        keywords = (
-            COMMON_INTENT_KEYWORDS.get(intent, ())
-            + local_keywords.get(intent, ())
-            + language_keywords.get(legacy_key, ())
+    product_matches = []
+    for product in PRODUCTS:
+        aliases = (product["name"], *PRODUCT_QUERY_ALIASES.get(product["name"], ()))
+        matched_aliases = [alias for alias in aliases if contains_phrase(alias)]
+        if matched_aliases:
+            product_matches.append((max(map(len, matched_aliases)), product))
+
+    if product_matches:
+        product = max(product_matches, key=lambda match: match[0])[1]
+        description = PRODUCT_DESCRIPTION_TRANSLATIONS.get(lang_code, {}).get(
+            product["name"],
+            product["description"],
         )
-        return any(matches(keyword) for keyword in keywords)
+        template = PRODUCT_DETAIL_TEMPLATES.get(
+            lang_code,
+            PRODUCT_DETAIL_TEMPLATES["en"],
+        )
+        return template.format(
+            name=product["name"],
+            category=product["category"],
+            price=product["price"],
+            description=description,
+        )
 
-    location_keywords = (
-        "mysore", "mysuru", "ಮೈಸೂರು", "ಮೈಸೂರಿಗೆ", "मैसूर", "मैसूरु",
-        "ಬೆಂಗಳೂರು", "ಬೆంగళూరు", "बेंगलुरु", "बेंगलूरु", "बैंगलोर",
-        "bengaluru", "bangalore", "hyderabad", "ಹೈದರಾಬಾದ್", "हैदराबाद",
-        "chennai", "சென்னை", "चेन्नई", "mumbai", "मुंबई", "ಮುಂಬೈ",
-        "delhi", "दिल्ली", "ದೆಹಲಿ", "pincode", "pin code", "postal code",
-        "serviceable", "deliver to",
-    )
-    location_mentioned = any(matches(keyword) for keyword in location_keywords)
-    location_name = next(
-        (
-            keyword for keyword in location_keywords
-            if keyword not in ("pincode", "pin code", "postal code", "serviceable", "deliver to")
-            and matches(keyword)
-        ),
-        None,
-    )
-    category = next(
-        (
-            name for name, keywords in CATEGORY_KEYWORDS.items()
-            if any(matches(keyword) for keyword in keywords)
-        ),
-        None,
-    )
-    product = next(
-        (
-            item for item in PRODUCTS
-            if matches(item["name"])
-            or any(matches(alias) for alias in PRODUCT_KEYWORDS.get(item["name"], ()))
-        ),
-        None,
-    )
+    vectorizer, faq_matrix = get_chatbot_faq_index()
+    query_vector = vectorizer.transform([query])
+    scores = cosine_similarity(query_vector, faq_matrix).ravel()
 
-    if has_intent("tracking"):
-        return details["tracking"]
-    if has_intent("delivery"):
-        if location_mentioned:
-            location_reply = details["location"]
-            if location_name:
-                location_display = (
-                    location_name.title() if location_name.isascii() else location_name
-                )
-                if lang_code == "kn":
-                    location_display = {
-                        "ಮೈಸೂರಿಗೆ": "ಮೈಸೂರು",
-                        "ಬೆಂಗಳೂರುಗೆ": "ಬೆಂಗಳೂರು",
-                    }.get(location_display, location_display)
-                location_reply = (
-                    f"{location_reply} "
-                    f"{LOCATION_FOLLOWUPS.get(lang_code, LOCATION_FOLLOWUPS['en']).format(location=location_display)}"
-                )
-            return location_reply
-        return responses["shipping"]
-    if has_intent("warranty"):
-        return WARRANTY_RESPONSES.get(lang_code, WARRANTY_RESPONSES["en"])
-    if has_intent("returns"):
-        return responses["returns"]
-    if has_intent("payments"):
-        return PAYMENT_RESPONSES.get(lang_code, PAYMENT_RESPONSES["en"])
-    if has_intent("offers"):
-        return details["offers"]
-    if has_intent("support"):
-        return details["support"]
-    if has_intent("catalog") or category or product:
-        if product:
-            return details["product_price"].format(
-                name=product["name"],
-                price=product["price"],
-            )
-        if category:
-            category_products = [
-                item for item in PRODUCTS if item["category"] == category
-            ]
-            items = ", ".join(
-                f"{item['name']} (₹{item['price']:,})"
-                for item in category_products
-            )
-            return details["category_products"].format(
-                category=category,
-                items=items,
-            )
-        if any(matches(keyword) for keyword in (
-            "price", "prices", "cost", "how much", "ಬೆಲೆ", "ದರ", "कीमत",
-            "मूल्य", "விலை", "ధర", "വില", "किंमत", "দাম", "કિંમત",
-            "قیمت", "precio", "prix", "preis", "価格", "السعر",
-        )):
-            return PRICE_PROMPTS.get(lang_code, PRICE_PROMPTS["en"])
-        return details["catalog"]
-    if has_intent("thanks"):
-        return details["thanks"]
-    if has_intent("greeting"):
-        return responses["greeting"]
+    for index, entry in enumerate(FAQ_KNOWLEDGE_BASE):
+        answer_intent = FAQ_ANSWER_INTENT[entry["answer"]]
+        language_intent = (
+            None if answer_intent in ("shipping", "shipping_fee")
+            else answer_intent
+        )
+        legacy_intent = (
+            None if answer_intent in ("shipping", "shipping_fee")
+            else answer_intent
+        )
+        extra_keywords = (
+            COMMON_INTENT_KEYWORDS.get(answer_intent, ())
+            + LOCAL_INTENT_KEYWORDS.get(lang_code, {}).get(language_intent, ())
+            + INTENT_KEYWORDS.get(lang_code, {}).get(legacy_intent, ())
+        )
+        matched_keywords = sum(
+            1
+            for keyword in (*entry["keywords"], *extra_keywords)
+            if contains_phrase(keyword)
+        )
+        matched_questions = sum(
+            1 for sample in entry["questions"] if contains_phrase(sample)
+        )
+        scores[index] += min(matched_keywords, 4) * 0.18
+        scores[index] += min(matched_questions, 2) * 0.35
 
-    specific_question = " ".join(question.split())[:120]
-    return details["fallback"].format(question=specific_question)
+    best_entry = FAQ_KNOWLEDGE_BASE[int(scores.argmax())]
+    return _localized_faq_answer(best_entry["answer"], lang_code)
 
 
 def speak(text, lang_code):
